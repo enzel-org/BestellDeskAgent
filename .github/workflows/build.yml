@@ -19,23 +19,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Check out repository with full history (tags)
+      # 1) Checkout with full history (needed for tags)
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Install Rust toolchain (stable) for Linux
+      # 2) Install Rust stable toolchain
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
 
-      # 3) Enable build caching for faster runs
+      # 3) Cache Cargo and target for faster builds
       - name: Cache cargo/target
         uses: Swatinem/rust-cache@v2
 
-      # 4) Run tests first (release profile, locked deps)
+      # 4) Run tests first (release, locked deps)
       - name: Test (release)
         run: cargo test --release --locked
 
@@ -43,33 +43,48 @@ jobs:
       - name: Build (release)
         run: cargo build --release --locked
 
-      # 6) Extract version from Cargo.toml via cargo metadata
+      # 6) Read version from Cargo.toml via cargo metadata
       - name: Read version from Cargo.toml
         run: |
           sudo apt-get update -y && sudo apt-get install -y jq
-          VER="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
-          echo "VERSION=$VER" >> "$GITHUB_ENV"
+          VERSION="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
 
-      # 7) Create and push git tag v<version> if it does not exist
+      # 7) Create and push git tag v<version> if missing
       - name: Create tag from version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git fetch --tags
-          TAG="v${VERSION}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists. Skipping creation."
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists. Skipping creation."
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
+            git tag -a "${TAG}" -m "Release ${TAG}"
+            git push origin "${TAG}"
           fi
 
-      # 8) Upload the single binary as artifact
-      - name: Upload BestellDeskAgent
-        uses: actions/upload-artifact@v4
+      # 8) Prepare release assets (binary + checksum)
+      - name: Prepare release assets
+        run: |
+          mkdir -p dist
+          # Copy Linux binary and make a deterministic filename
+          cp target/release/BestellDeskAgent dist/BestellDeskAgent-linux-x86_64
+          (cd dist && sha256sum BestellDeskAgent-linux-x86_64 > BestellDeskAgent-linux-x86_64.sha256)
+          ls -l dist
+
+      # 9) Create GitHub Release (from tag) and upload assets
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
         with:
-          name: BestellDeskAgent-linux-${{ env.VERSION }}
-          path: target/release/BestellDeskAgent
-          if-no-files-found: error
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/BestellDeskAgent-linux-x86_64
+            dist/BestellDeskAgent-linux-x86_64.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
