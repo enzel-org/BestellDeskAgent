@@ -58,8 +58,8 @@ or
 ```bash
 nano /etc/bestelldesk-agent/agent.env
 ```
-or what ever editor you feel using
-Don't forget to reload your service
+or what ever editor you feel using  
+Don't forget to reload your service  
 ```bash
 sudo systemctl restart bestelldesk-agent
 ```
