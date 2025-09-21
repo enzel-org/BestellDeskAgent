@@ -1,0 +1,75 @@
+name: Rust Release (Linux)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - ".github/workflows/release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build BestellDeskAgent on Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Check out repository with full history (tags)
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2) Install Rust toolchain (stable) for Linux
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      # 3) Enable build caching for faster runs
+      - name: Cache cargo/target
+        uses: Swatinem/rust-cache@v2
+
+      # 4) Run tests first (release profile, locked deps)
+      - name: Test (release)
+        run: cargo test --release --locked
+
+      # 5) Build after tests (release, locked deps)
+      - name: Build (release)
+        run: cargo build --release --locked
+
+      # 6) Extract version from Cargo.toml via cargo metadata
+      - name: Read version from Cargo.toml
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y jq
+          VER="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          echo "VERSION=$VER" >> "$GITHUB_ENV"
+
+      # 7) Create and push git tag v<version> if it does not exist
+      - name: Create tag from version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --tags
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Skipping creation."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+      # 8) Upload the single binary as artifact
+      - name: Upload BestellDeskAgent
+        uses: actions/upload-artifact@v4
+        with:
+          name: BestellDeskAgent-linux-${{ env.VERSION }}
+          path: target/release/BestellDeskAgent
+          if-no-files-found: error
