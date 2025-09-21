@@ -9,6 +9,7 @@ on:
       - "Cargo.lock"
       - "src/**"
       - ".github/workflows/release.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
