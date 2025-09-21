@@ -52,12 +52,10 @@ AGENT_BIND="0.0.0.0:8443"
 Run:
 
 ```bash
-sudo bestelldesk-agent.sh edit
+vi /etc/bestelldesk-agent/agent.env
+nano /etc/bestelldesk-agent/agent.env
 ```
-or
-```bash
-curl -sSL https://raw.githubusercontent.com/enzel-org/BestellDeskAgent/master/bestelldesk-agent.sh | bash -s edit
-```
+or what ever editor you feel using
 
 This opens the `agent.env` in your editor (`nano` if `$EDITOR` is not set).  
 After saving, the service automatically reloads.
