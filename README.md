@@ -59,8 +59,6 @@ or
 nano /etc/bestelldesk-agent/agent.env
 ```
 or what ever editor you feel using
-
-This opens the `agent.env` in your editor (`nano` if `$EDITOR` is not set).  
 Don't forget to reload your service
 ```bash
 sudo systemctl restart bestelldesk-agent
